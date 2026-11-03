@@ -6,7 +6,7 @@
 
 Правила оформлення програмного коду на мові C#
 
-Методи рефакторингу Фаулера: Consolidate Conditional Expression, Encapsulate Field, Rename Method для Java
+Методи рефакторинґу: Consolidate Conditional Expression, Encapsulate Field, Rename Method для Java
 
 Програмна система для контролю доступу до серверних приміщень
 
