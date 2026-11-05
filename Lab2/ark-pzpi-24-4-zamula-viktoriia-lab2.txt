@@ -1,0 +1,113 @@
+﻿Харківський національний університет радіоелектроніки
+Факультет комп’ютерних наук
+Катедра програмної інженерії
+
+
+
+
+
+ЗВІТ
+до лабораторної роботи № 2
+з дисципліни «Аналіз та рефакторинґ коду»
+на тему: «Розробка бази даних для серверної частини програмної системи та прикладного програмного інтерфейсу (API)»
+
+
+
+
+
+
+Виконала							Перевірив
+ст. гр. ПЗПІ-24-4						ст. викладач катедри ПІ
+Замула Вікторія Вадимівна 				Дашенков Дмитро Сергійович
+
+
+
+
+
+
+Харків 2026
+
+
+1 ЗАВДАННЯ
+     Метою роботи є ознайомитися з процесом розробки серверної частини програмної системи, включаючи проектування бази даних (БД), розробку API для взаємодії з клієнтами, та перевірку (тестування) їхньої взаємодії. Оволодіти методами проектування діаграм UML та ER, розробки БД, програмної реалізації API, а також роботи з репозиторіями Git та створення технічної документації.
+     
+
+2 ОПИС ВИКОНАНОЇ РОБОТИ
+     2.1 Опис інженерних рішень
+     Серверну частину проекту побудовано за багатошаровою архітектурою, щоб розмежувати обробку запитів, бізнес-логіку та роботу з даними. Основою бекенду є Spring Boot, який надає REST API для взаємодії з Mobile- клієнтом, Web-клієнтом та IoT-пристроєм.
+     Для забезпечення безпеки реалізовано гібридний підхід до автентифікації. Взаємодія з Web та Mobile захищена за допомогою безстанових JWT-токенів із обмеженим строком дії, для взаємодії з IoT-пристроями використовуються механізм перевірки HMAC-SHA256 підписів на базі симетричних ключів та перевірка часових міток для захисту від атак повторного відтворення.
+     Взаємодія з базою даних MS SQL Server реалізована за допомогою Spring JDBC Template. Це рішення дозволило перенаправити частину складної бізнес-логіки та перевірок цілісності на рівень бази даних, такі як використання збережених процедур, функцій та тригерів, забезпечивши високу продуктивність та атомарність операцій. Для збереження конфігурацій, аудит-логів, результатів роботи LLM та GDPR-згод застосовано механізм локального кешування із записом у JSON-файл, що зменшує навантаження на базу даних для даних, які не потребують складних зв’язків.
+     Інтеграція з моделлю штучного інтелекту Gemini виконана з дотриманням приватності: перед відправкою логів для формування підсумків та аналізу розбіжностей, система виконує знеособлення даних, гарантуючи, що модель працює виключно з загальними даними без доступу до конфіденційної інформації.
+     2.2 Специфікація API для взаємодії серверної частини з клієнтами
+     Специфікацію API для взаємодії серверної частини з клієнтами наведено у таблиці 1. 
+     
+     
+     
+     Таблиця 1 – Специфікація API
+МетодЕндпоінтПризначенняPOST/api/auth/loginАвтентифікація та отримання JWT.GET/api/auth/meОтримання профілю поточного користувача.PUT/api/auth/me/preferencesОновлення налаштувань (мова, система мір, часовий пояс).POST/api/me/consentНадання згоди на обробку персональних даних.DELETE/api/me/consentВідкликання згоди на обробку даних.POST/api/me/gdpr-requestsСтворення запиту за правилами GDPR.GET/api/me/gdpr-requestsОтримання списку власних GDPR-запитів.GET/api/me/gdpr-requests/{id}/resultЗавантаження JSON-файлу з експортованими даними.GET/api/healthПублічна перевірка статусу системи та БД.GET/api/roomsОтримання списку доступних приміщень.POST/api/requestsСтворення нової заявки на візит (приміщення, мета, час).GET/api/requests/myПерегляд списку власних заявок та дозволів.POST/api/requests/{id}/cancelСкасування власної заявки до початку вікна.POST/api/visits/confirmПідтвердження присутності на місці (валідація QR-коду).POST/api/visits/openЗапит на отримання BLE-команди для відкриття дверей.GET/api/visits/commands/{commandId}Перевірка стану надісланої команди.POST/api/visits/{requestId}/checklistЗаповнення чеклиста завершення візиту.POST/api/iot/heartbeatПередача статусу пристрою та версії прошивки (кожні 30 с).GET/api/iot/commandsПередача активних команд від сервера до пристрою.POST/api/iot/commands/{nonce}/resultЗвіт пристрою про результат виконання команди.POST/api/iot/eventsПакетна відправка подій від датчиків (відкриття, температура тощо).POST/api/iot/rfidПеревірка хешу UID зчитаної RFID-мітки на сервері.GET/api/admin/usersОтримання списку всіх користувачів.GET/api/admin/users/{id}Перегляд деталей конкретного користувача.POST/api/admin/usersСтворення нового користувача.PUT/api/admin/users/{id}Оновлення даних користувача.PUT/api/admin/users/{id}/roleЗміна ролі.PUT/api/admin/users/{id}/statusБлокування або розблокування облікового запису.POST/api/admin/users/{id}/archiveПереміщення користувача в архів.DELETE/api/admin/users/{id}Видалення користувача з БД.POST/api/admin/users/importМасове завантаження користувачів із CSV-файлу.GET/api/admin/users/exportЕкспорт списку користувачів (формати JSON/CSV).GET/api/admin/roomsОтримання списку приміщень (з опцією архівних).POST/api/admin/roomsСтворення нового приміщення.PUT/api/admin/rooms/{id}Редагування приміщення.POST/api/admin/rooms/{id}/archiveАрхівування приміщення.DELETE/api/admin/rooms/{id}Повне видалення приміщення.GET/api/admin/doorsОтримання списку всіх дверей.POST/api/admin/doorsСтворення нових дверей та прив’язка до приміщення.PUT/api/admin/doors/{id}Редагування даних дверей.PUT/api/admin/doors/{id}/deviceПрив’язка фізичного пристрою  до дверей.DELETE/api/admin/doors/{id}/deviceВідкріплення IoT-пристрою від дверей.POST/api/admin/doors/{id}/archiveАрхівування дверей.DELETE/api/admin/doors/{id}Повне видалення дверей.GET/api/admin/doors/{id}/qrГенерація підписаного QR-коду для дверей.GET/api/admin/doors/{id}/device-secretПерегляд секрету пристрою для налаштування ESP32.GET/api/admin/requestsПерегляд черги заявок з фільтрацією за статусом.POST/api/admin/requests/{id}/approveПогодження заявки.POST/api/admin/requests/{id}/rejectВідхилення заявки з обов’язковим коментарем.POST/api/admin/permissions/{id}/cancelСкасування раніше виданого активного дозволу.GET/api/admin/rooms/{roomId}/calendarОтримання тижневого розкладу візитів для приміщення.GET/api/admin/permissions/activeОтримання всіх активних дозволів на даний момент.GET/api/admin/eventsПосторінковий перегляд журналу доступу (з фільтрами).GET/api/admin/export/eventsЕкспорт журналу доступу (CSV/JSON).GET/api/admin/anomaliesПерегляд списку зафіксованих розбіжностей/аномалій.GET/api/admin/analytics/visitsАгрегована статистика відвідувань (дні, тижні, місяці).GET/api/admin/analytics/statsГлобальна статистика (тривалість, відхилення, піки).GET/api/admin/analytics/dashboardЗведені дані для панелі моніторингу.POST/api/admin/llm/summaryЗапит до LLM на формування підсумку за період.POST/api/admin/llm/explainЗапит до LLM на пояснення виявлених розбіжностей.GET/api/admin/llm/logПерегляд історії запитів до ШІ (аудит).GET/api/admin/settingsПерегляд глобальних налаштувань.PUT/api/admin/settingsЗміна глобальних налаштувань.GET/api/admin/backupsПерегляд списку доступних резервних копій БД.POST/api/admin/backupsСтворення нової резервної копії БД вручну.POST/api/admin/backups/{id}/restoreВідновлення БД з вибраної копії (потребує підтвердження).GET/api/admin/certificatesПерегляд списку SSL/TLS сертифікатів серверів.POST/api/admin/certificatesВипуск нового сертифіката.POST/api/admin/certificates/{id}/revokeВідкликання сертифіката.GET/api/admin/healthРозширений моніторинг стану (база, API, пристрої).GET/api/admin/auditПерегляд незмінного журналу аудиту дій у системі.GET/api/admin/gdpr/requestsПерегляд черги запитів користувачів на видалення/експорт.POST/api/admin/gdpr/requests/{id}/executeВиконання GDPR-запиту (видалення або вивантаження JSON).GET/api/admin/db/functions/approved-by-roomВиклик функції T-SQL для підрахунку погоджених заявок.GET/api/admin/db/functions/active-usersПідрахунок активних користувачів за роллю.GET/api/admin/db/functions/events-after-averageФільтрація подій за середнім часом через функцію БД.POST/api/admin/db/procedures/categorize-events/{doorId}Виклик процедури категоризації подій.POST/api/admin/db/procedures/safe-insert-eventБезпечна вставка події через процедуру.GET/api/admin/db/cursors/every-second-event/{doorId}Читання кожної другої події курсором.DELETE/api/admin/db/cursors/rejected-requestsВидалення відхилених заявок із застосуванням курсора.     2.3 Фрагменти програмного коду
+     Взаємодія з базою даних реалізована через шар репозиторіїв з використанням JdbcTemplate. У розділі Б.1 додатка Б наведено фрагмент з RequestRepository.java, який демонструє виклик збереженої процедури sp_InsertAccessRequest для створення заявки та виконання SELECT-запиту для перевірки перетину часових вікон.
+     Обробка HTTP-запитів від клієнтів реалізована у REST-контролерах. У розділі Б.2 додатка Б наведено фрагмент з VisitorController.java, який демонструє процес прийому запиту на створення нової заявки та передачу управління до сервісного шару.
+
+
+     2.4 Графічні ілюстрації
+      UML діаграма прецедентів для серверної частини зображена на рисунку 1. 
+
+Рисунок 1 – UML діаграма прецедентів для серверної частини
+     ER діаграма бази даних зображена на рисунку 2.
+      
+Рисунок 2 – ER діаграма бази даних
+
+     Схема бази даних зображена на рисунку 3.
+      
+Рисунок 3 – Схема бази даних
+     
+
+3 ВИСНОВКИ
+     У результаті виконання лабораторної роботи було розглянуто процес розробки серверної частини програмної системи, включаючи проектування бази даних (БД), розробку API для взаємодії з клієнтами, та перевірку (тестування) їхньої взаємодії. Було набуто навички проектування діаграм UML та ER, розробки БД, програмної реалізації API, а також роботи з репозиторіями Git та створення технічної документації.
+
+     
+
+ДОДАТОК А
+Відеозапис
+     Відеозапис захисту лабораторної роботи: https://youtu.be/xvUY_SwaRWU
+     Хронологічний опис відеозапису:
+     00:00 – Вступ та огляд інженерних рішень.
+     01:14 – Огляд діаграм та структури БД.
+     02:00 – Виконання запитів до API, демонстрація взаємодії з усіма клієнтами (сценарій – створення заявки відвідувачем, підтвердження адміністратором, підтвердження на місці та вхід до приміщення).
+     07:54 – Демонстрація роботи збереженої функції.
+     08:29 – Висновки.
+     
+
+     ДОДАТОК Б
+     Програмний код
+     Б.1 ЛОГІКА ВЗАЄМОДІЇ СЕРВЕРНОЇ ЧАСТИНИ З БД
+     GitHub репозиторій: https://github.com/NureZamulaViktoriia/ark-pzpi-24-4-zamula-viktoriia/blob/main/Lab2/pzpi-24-4-zamula-viktoriia-lab2/rackguard-server/src/main/java/com/rackguard/rackguardserver/repository/RequestRepository.java#L35-L45
+1 public Integer insertViaProc(Integer userId, Integer roomId, String purpose, LocalDateTime start, LocalDateTime end) {
+2    callProc("{call dbo.sp_InsertAccessRequest(?, ?, ?, ?, ?)}", userId, roomId, purpose, start, end);
+3    return jdbc.query("SELECT TOP 1 RequestId FROM dbo.AccessRequests WHERE UserId = ? AND RoomId = ? " + "AND StartTime = ? AND EndTime = ? ORDER BY RequestId DESC", (rs, n) -> rs.getInt(1), userId, roomId, start, end).stream().findFirst().orElse(null);
+4 }
+5
+6 public List<AccessRequest> findOverlapping(Integer userId, LocalDateTime start, LocalDateTime end) {
+7    return jdbc.query("SELECT * FROM dbo.AccessRequests WHERE UserId = ? AND Status IN " + LIVE + " AND StartTime < ? AND EndTime > ?", MAPPER, userId, end, start);
+8 }
+     Б.2 ЛОГІКА ВЗАЄМОДІЇ СЕРВЕРНОЇ ЧАСТИНИ З КЛІЄНТАМИ
+     GitHub репозиторій: https://github.com/NureZamulaViktoriia/ark-pzpi-24-4-zamula-viktoriia/blob/main/Lab2/pzpi-24-4-zamula-viktoriia-lab2/rackguard-server/src/main/java/com/rackguard/rackguardserver/controller/VisitorController.java#L16-L39
+1 @RestController
+2 @Tag(name = "Visitor (Mobile)")
+3 public class VisitorController {
+4
+5     public record CreateBody(@NotNull Integer roomId, @NotBlank String purpose, @NotNull OffsetDateTime startTime, @NotNull OffsetDateTime endTime) {}
+6
+7     private final RequestService requests;
+8
+9     public VisitorController(RequestService requests, CatalogService catalog) {
+10         this.requests = requests;
+11     }
+12
+13     @PostMapping("/api/requests")
+14     public RequestService.View create(@Valid @RequestBody CreateBody b) {
+15         return requests.create(Auth.userId(), b.roomId(), b.purpose(), b.startTime(), b.endTime());
+16     }
+17 }
+
+
